@@ -23,24 +23,23 @@ function Login() {
       const res = await loginUser(username, password);
 
       const { access, role } = res.data;
-      console.log("ROLE:", role);
+      localStorage.setItem("accessToken", access);
 
-      login({ token: access, role });
+      let verificationStatus = null;
 
       if (role === "VOLUNTEER") {
         const statusRes = await getMyVerificationStatus(access);
+        verificationStatus = statusRes.data.status;
 
-        login({
-          token: access,
-          role: role,
-          verificationStatus: statusRes.data.status, // 🔥 REQUIRED
-        });
-
-        if (statusRes.data.status !== "APPROVED") {
+        if (verificationStatus !== "APPROVED") {
+          login({ token: access, role, verificationStatus });
           navigate("/pending-approval");
           return;
         }
       }
+
+      login({ token: access, role, verificationStatus });
+      navigate("/dashboard");
 
       navigate("/dashboard");
     } catch (err) {

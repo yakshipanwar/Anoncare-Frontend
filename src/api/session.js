@@ -20,6 +20,14 @@ export const requestSession = async (token) => {
   );
 };
 
+export const getPendingRequests = () => {
+  return api.get("/chat/pending-requests/");
+};
+
+export const acceptSession = (sessionId) => {
+  return api.post(`/chat/accept/${sessionId}/`);
+};
+
 export const endSession = (sessionId, token) => {
   return api.post(
     `/chat/end-session/${sessionId}/`,
