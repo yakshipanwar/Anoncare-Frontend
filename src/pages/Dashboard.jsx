@@ -10,7 +10,8 @@ import {
   endSession
 } from "../api/session";
 import Chat from "./Chat";
-import DailyCheckIn from "../components/DailyCheckIn"; // <-- IMPORT HERE
+import DailyCheckIn from "../components/DailyCheckIn";
+import CopingStrategies from "../components/CopingStrategies";
 
 function Dashboard() {
   const { auth, logout } = useContext(AuthContext);
@@ -20,11 +21,11 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [endedBy, setEndedBy] = useState(null);
+  const [activeTab, setActiveTab] = useState("home"); // <-- New state for tabs: home, coping, checkin
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const WS_URL = API_URL.replace('http', 'ws');
 
-  // ---------- API Functions ----------
   const fetchSession = useCallback(async () => {
     try {
       const res = await getMySession();
@@ -48,7 +49,6 @@ function Dashboard() {
     }
   }, [auth.role]);
 
-  // ---------- Handlers ----------
   const handleRequest = async () => {
     setError("");
     setEndedBy(null);
@@ -56,7 +56,7 @@ function Dashboard() {
     
     try {
       const res = await requestSession();
-      setSession(res.data); // <-- This triggers DailyCheckIn to disappear
+      setSession(res.data);
     } catch (err) {
       if (err.response?.status === 403) {
         setError("Permission denied. Please ensure you're logged in as a seeker.");
@@ -88,7 +88,7 @@ function Dashboard() {
     
     try {
       await endSession(session.id);
-      setSession(null); // <-- This brings DailyCheckIn back
+      setSession(null);
       setEndedBy("self");
       setError("");
       
@@ -100,7 +100,6 @@ function Dashboard() {
     }
   };
 
-  // ---------- WebSocket ----------
   const { status: wsStatus } = useWebSocket(
     `${WS_URL}/ws/dashboard/?token=${auth.token}`,
     {
@@ -108,7 +107,7 @@ function Dashboard() {
         if (data.type === "session_update" && data.event === "session_ended") {
           const endedByRole = data.data?.ended_by;
           if (endedByRole && endedByRole !== auth.role) {
-            setSession(null); // <-- Brings DailyCheckIn back when other user ends
+            setSession(null);
             setEndedBy(endedByRole.toLowerCase());
             setError(`Session ended by ${endedByRole.toLowerCase()}`);
             if (auth.role === "VOLUNTEER") fetchPending();
@@ -131,7 +130,6 @@ function Dashboard() {
     }
   );
 
-  // ---------- Initial Load ----------
   useEffect(() => {
     const init = async () => {
       await fetchSession();
@@ -158,6 +156,42 @@ function Dashboard() {
             Anon<span className="text-blue-500">Care</span>
           </Link>
           
+          {/* Navigation Tabs - Show only when no active session */}
+          {!session && (
+            <div className="hidden md:flex items-center gap-1 bg-gray-900/50 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab("home")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "home" 
+                    ? "bg-gray-800 text-white" 
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Chat
+              </button>
+              <button
+                onClick={() => setActiveTab("coping")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "coping" 
+                    ? "bg-blue-600 text-white" 
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                🧰 Coping Tools
+              </button>
+              <button
+                onClick={() => setActiveTab("checkin")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "checkin" 
+                    ? "bg-emerald-600 text-white" 
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                📋 Daily Check-in
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${
               wsStatus === 'connected' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
@@ -197,39 +231,44 @@ function Dashboard() {
           </div>
         )}
 
-        {/* SEEKER VIEW - NO ACTIVE SESSION */}
+        {/* SEEKER VIEW - NO SESSION */}
         {auth.role === "SEEKER" && !session && (
-          <div className="space-y-8">
-            {/* Request Section */}
-            <div className="max-w-2xl mx-auto text-center py-12">
-              <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-10 backdrop-blur-sm">
-                <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+          <>
+            {/* TAB: HOME (Chat Request) */}
+            {activeTab === "home" && (
+              <div className="max-w-2xl mx-auto text-center py-20">
+                <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-10 backdrop-blur-sm">
+                  <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-semibold mb-3">Need someone to talk to?</h2>
+                  <p className="text-gray-400 mb-8">Connect with a verified volunteer anonymously</p>
+                  <button
+                    onClick={handleRequest}
+                    disabled={requesting || wsStatus !== "connected"}
+                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition shadow-lg shadow-blue-600/20"
+                  >
+                    {requesting ? "Requesting..." : "Request Support Session"}
+                  </button>
+                  {wsStatus !== "connected" && (
+                    <p className="mt-4 text-sm text-yellow-500">Connecting to server...</p>
+                  )}
                 </div>
-                <h2 className="text-2xl font-semibold mb-3">Need someone to talk to?</h2>
-                <p className="text-gray-400 mb-8">Connect with a verified volunteer anonymously</p>
-                <button
-                  onClick={handleRequest}
-                  disabled={requesting || wsStatus !== "connected"}
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition shadow-lg shadow-blue-600/20"
-                >
-                  {requesting ? "Requesting..." : "Request Support Session"}
-                </button>
-                {wsStatus !== "connected" && (
-                  <p className="mt-4 text-sm text-yellow-500">Connecting to server...</p>
-                )}
               </div>
-            </div>
+            )}
 
-            {/* DAILY CHECK-IN SECTION - Shows only when no session */}
-            <div className="max-w-2xl mx-auto">
-              <div className="border-t border-gray-800 pt-8">
-                <DailyCheckIn token={auth.token} />
+            {/* TAB: COPING STRATEGIES */}
+            {activeTab === "coping" && <CopingStrategies />}
+
+            {/* TAB: DAILY CHECK-IN */}
+            {activeTab === "checkin" && (
+              <div className="max-w-2xl mx-auto">
+                <DailyCheckIn />
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
 
         {/* VOLUNTEER VIEW - NO SESSION */}
@@ -247,7 +286,6 @@ function Dashboard() {
                   </svg>
                 </div>
                 <p className="text-gray-400">No seekers waiting at the moment</p>
-                <p className="text-sm text-gray-600 mt-2">New requests will appear automatically</p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -268,7 +306,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* ACTIVE SESSION - Chat (DailyCheckIn hidden) */}
+        {/* ACTIVE SESSION - Chat (Tabs hidden) */}
         {session && (
           <div className="max-w-4xl mx-auto">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
