@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import AuthContext from "../context/AuthContext";
 import { useWebSocket } from "../hooks/useWebSocket";
 import {
@@ -10,16 +10,16 @@ import {
   endSession
 } from "../api/session";
 import Chat from "./Chat";
+import DailyCheckIn from "../components/DailyCheckIn"; // <-- IMPORT HERE
 
 function Dashboard() {
   const { auth, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
   const [session, setSession] = useState(null);
   const [pending, setPending] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
-  const [endedBy, setEndedBy] = useState(null); // Track who ended the session
+  const [endedBy, setEndedBy] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   const WS_URL = API_URL.replace('http', 'ws');
@@ -56,13 +56,13 @@ function Dashboard() {
     
     try {
       const res = await requestSession();
-      setSession(res.data);
+      setSession(res.data); // <-- This triggers DailyCheckIn to disappear
     } catch (err) {
       if (err.response?.status === 403) {
         setError("Permission denied. Please ensure you're logged in as a seeker.");
       } else if (err.response?.status === 400) {
         setError(err.response.data?.detail || "You already have an active session");
-        fetchSession(); // Refresh to show existing
+        fetchSession();
       } else {
         setError("Failed to request session. Please try again.");
       }
@@ -84,14 +84,13 @@ function Dashboard() {
   };
 
   const handleEnd = async () => {
-    if (!window.confirm("Are you sure you want to end this session? This cannot be undone.")) {
-      return;
-    }
+    if (!window.confirm("Are you sure you want to end this session?")) return;
     
     try {
       await endSession(session.id);
-      setSession(null);
-      setEndedBy("self"); // You ended it
+      setSession(null); // <-- This brings DailyCheckIn back
+      setEndedBy("self");
+      setError("");
       
       if (auth.role === "VOLUNTEER") {
         await fetchPending();
@@ -106,27 +105,13 @@ function Dashboard() {
     `${WS_URL}/ws/dashboard/?token=${auth.token}`,
     {
       onMessage: useCallback(async (data) => {
-        console.log("Dashboard WS:", data.type, data);
-        
         if (data.type === "session_update" && data.event === "session_ended") {
           const endedByRole = data.data?.ended_by;
-          
-          // Only show notification if OTHER user ended it
           if (endedByRole && endedByRole !== auth.role) {
-            setSession(null);
+            setSession(null); // <-- Brings DailyCheckIn back when other user ends
             setEndedBy(endedByRole.toLowerCase());
             setError(`Session ended by ${endedByRole.toLowerCase()}`);
-            
-            // Play notification sound
-            try {
-              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVanu8LdnFgUuh9Dz2YU2Bhxqv+zplkYNDVGm5O+4ZSAEMYrO89GFNwYdcfDr4ZdJDQtPp+XysWUeBjiS1/LNfi0GI33R8tOENAcdcO/r4phJDQxPqOXyxGUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdcfDr4plHDAtQp+TwxWUhBjqT1/PQfS4GI3/R8tSFNwYdc'); 
-              audio.volume = 0.3;
-              audio.play();
-            } catch(e) {}
-          }
-          
-          if (auth.role === "VOLUNTEER") {
-            fetchPending();
+            if (auth.role === "VOLUNTEER") fetchPending();
           }
         }
         else if (data.type === "new_request" && auth.role === "VOLUNTEER") {
@@ -134,9 +119,6 @@ function Dashboard() {
         }
         else if (data.type === "request_accepted" && auth.role === "SEEKER") {
           fetchSession();
-        }
-        else if (data.type === "pending_list") {
-          setPending(data.data || []);
         }
       }, [auth.role, fetchPending, fetchSession]),
       
@@ -159,7 +141,6 @@ function Dashboard() {
     init();
   }, [fetchSession, fetchPending, auth.role]);
 
-  // ---------- Render ----------
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">
@@ -193,9 +174,9 @@ function Dashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8">
-        {/* Success/Error Messages */}
+        {/* Session Ended Notification */}
         {endedBy && endedBy !== "self" && (
-          <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 animate-in slide-in-from-top-2">
+          <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -203,11 +184,9 @@ function Dashboard() {
             </div>
             <div className="flex-1">
               <h3 className="font-medium text-yellow-400">Session Ended</h3>
-              <p className="text-sm text-yellow-500/80">
-                The {endedBy} has ended the session. You can request a new session if needed.
-              </p>
+              <p className="text-sm text-yellow-500/80">The {endedBy} has ended the session.</p>
             </div>
-            <button onClick={() => setEndedBy(null)} className="text-yellow-400 hover:text-yellow-300 text-xl leading-none">×</button>
+            <button onClick={() => setEndedBy(null)} className="text-yellow-400 hover:text-yellow-300 text-xl">×</button>
           </div>
         )}
 
@@ -218,26 +197,42 @@ function Dashboard() {
           </div>
         )}
 
-        {/* SEEKER - NO SESSION */}
+        {/* SEEKER VIEW - NO ACTIVE SESSION */}
         {auth.role === "SEEKER" && !session && (
-          <div className="max-w-2xl mx-auto text-center py-20">
-            <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-12 backdrop-blur-sm">
-              <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+          <div className="space-y-8">
+            {/* Request Section */}
+            <div className="max-w-2xl mx-auto text-center py-12">
+              <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-10 backdrop-blur-sm">
+                <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-semibold mb-3">Need someone to talk to?</h2>
+                <p className="text-gray-400 mb-8">Connect with a verified volunteer anonymously</p>
+                <button
+                  onClick={handleRequest}
+                  disabled={requesting || wsStatus !== "connected"}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-medium transition shadow-lg shadow-blue-600/20"
+                >
+                  {requesting ? "Requesting..." : "Request Support Session"}
+                </button>
+                {wsStatus !== "connected" && (
+                  <p className="mt-4 text-sm text-yellow-500">Connecting to server...</p>
+                )}
               </div>
-              <h2 className="text-2xl font-semibold mb-3">Need someone to talk to?</h2>
-              <p className="text-gray-400 mb-8">Connect with a verified volunteer anonymously</p>
-              <button onClick={handleRequest} disabled={requesting || wsStatus !== "connected"} className="px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl font-medium transition shadow-lg shadow-blue-600/20">
-                {requesting ? "Requesting..." : "Request Support Session"}
-              </button>
-              {wsStatus !== "connected" && <p className="mt-4 text-sm text-yellow-500">Connecting to server...</p>}
+            </div>
+
+            {/* DAILY CHECK-IN SECTION - Shows only when no session */}
+            <div className="max-w-2xl mx-auto">
+              <div className="border-t border-gray-800 pt-8">
+                <DailyCheckIn token={auth.token} />
+              </div>
             </div>
           </div>
         )}
 
-        {/* VOLUNTEER - NO SESSION */}
+        {/* VOLUNTEER VIEW - NO SESSION */}
         {auth.role === "VOLUNTEER" && !session && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -252,6 +247,7 @@ function Dashboard() {
                   </svg>
                 </div>
                 <p className="text-gray-400">No seekers waiting at the moment</p>
+                <p className="text-sm text-gray-600 mt-2">New requests will appear automatically</p>
               </div>
             ) : (
               <div className="grid gap-4">
@@ -272,7 +268,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* ACTIVE SESSION */}
+        {/* ACTIVE SESSION - Chat (DailyCheckIn hidden) */}
         {session && (
           <div className="max-w-4xl mx-auto">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
